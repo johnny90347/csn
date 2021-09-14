@@ -48,8 +48,8 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
         }
       });
 
-    /// 1.3 秒後,開始漸變淡
-    Future.delayed(Duration(milliseconds: 3000), () {
+    /// 2 秒後,開始漸變淡
+    Future.delayed(Duration(milliseconds: 2000), () {
       _controller.forward();
     });
   }
@@ -101,7 +101,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void initState() {
     WidgetsBinding.instance?.addPostFrameCallback((_) async {
       /// 0.5秒後,開始載入WebView
-      Future.delayed(Duration(milliseconds: 400), () {
+      Future.delayed(Duration(milliseconds: 500), () {
         setState(() {
           startLoadingWebView = true;
         });
