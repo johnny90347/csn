@@ -49,7 +49,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
       });
 
     /// 1.3 秒後,開始漸變淡
-    Future.delayed(Duration(milliseconds: 2000), () {
+    Future.delayed(Duration(milliseconds: 3000), () {
       _controller.forward();
     });
   }
