@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(MyApp());
@@ -111,6 +112,52 @@ class _WebViewScreenState extends State<WebViewScreen> {
     super.initState();
   }
 
+  bool _isWindowDisplayed = false;
+
+  Future<bool> _onCreateWindow(InAppWebViewController controller, CreateWindowAction createWindowAction) async {
+    _isWindowDisplayed = true;
+    showDialog<AlertDialog>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          contentPadding: EdgeInsets.all(2.0),
+          insetPadding: EdgeInsets.all(20.0),
+          content: Container(
+            width: MediaQuery.of(context).size.width,
+            height: MediaQuery.of(context).size.height,
+            child: InAppWebView(
+              // Setting the windowId property is important here!
+              windowId: createWindowAction.windowId,
+              initialOptions: InAppWebViewGroupOptions(
+                android: AndroidInAppWebViewOptions(
+                  builtInZoomControls: true,
+                  thirdPartyCookiesEnabled: true,
+                ),
+                // crossPlatform: InAppWebViewOptions(
+                //     userAgent: "Mozilla/5.0 (Linux; Android 9; LG-H870 Build/PKQ1.190522.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.106 Mobile Safari/537.36"
+                // ),
+              ),
+              onLoadStart: (controller,url){
+                print("開始載入: $url");
+              },
+              onCloseWindow: (controller) {
+                // On Facebook Login, this event is called twice,
+                // so here we check if we already popped the alert dialog context
+                // if (_isWindowDisplayed) {
+                //   Navigator.pop(context);
+                //   _isWindowDisplayed = false;
+                // }
+
+                print("onCloseWindowonCloseWindowonCloseWindowonCloseWindow");
+              },
+            ),
+          ),
+        );
+      },
+    );
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final appBarHeight = kToolbarHeight;
@@ -138,11 +185,44 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         initialUrlRequest: URLRequest(url: Uri.parse(_mobileUrl)),
                         initialOptions: InAppWebViewGroupOptions(
                             crossPlatform: InAppWebViewOptions(
+                              disableContextMenu: false,
+                          javaScriptCanOpenWindowsAutomatically: true,
                           // cacheEnabled: false,
                           supportZoom: false,
                         )),
                         onWebViewCreated: (InAppWebViewController controller) {},
-                      )
+                        onCreateWindow: (InAppWebViewController controller, CreateWindowAction createWidowAction) async {
+                          print("接收到的網址 : ${createWidowAction.request}");
+
+                          final urlString = createWidowAction.request.url.toString();
+                          final urlEncodeFull = Uri.encodeFull(urlString);
+                          print("網址: $urlEncodeFull");
+                          if (await canLaunch(urlEncodeFull)) {
+                            await launch(urlEncodeFull);
+                          } else {
+                            throw 'Could not launch $urlEncodeFull';
+                          }
+
+                          return Future<bool>.value(true);
+                        }
+                        // onCreateWindow: (InAppWebViewController controller, CreateWindowAction createWidowAction) async {
+                        //   print("來看看喔!: ${createWidowAction.request}");
+                        //
+                        //   final urlString = createWidowAction.request.url.toString();
+                        //   final urlEncodeFull = Uri.encodeFull(urlString);
+                        //   // print("看看網址: $urlEncodeFull");
+                        //   // if (await canLaunch(urlEncodeFull)) {
+                        //   //   await launch(urlEncodeFull);
+                        //   // } else {
+                        //   //   throw 'Could not launch $urlEncodeFull';
+                        //   // }
+                        //   //
+                        //   // return Future<bool>.value(true);
+                        //
+                        //   return _onCreateWindow(controller, createWidowAction);
+                        // }
+                        
+                        )
                     : SizedBox(),
               ),
 
