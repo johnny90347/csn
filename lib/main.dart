@@ -5,11 +5,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+enum CurrentDeviceType {
+  ANDROID,
+  iOS,
+}
+
+/// 現在是哪個平台 iOS or Android
+CurrentDeviceType currentDeviceType = CurrentDeviceType.ANDROID;
+
 void main() async {
   /// 必要
   WidgetsFlutterBinding.ensureInitialized();
 
   if (Platform.isAndroid) {
+    currentDeviceType = CurrentDeviceType.ANDROID;
+
     await AndroidInAppWebViewController.setWebContentsDebuggingEnabled(true);
 
     var swAvailable = await AndroidWebViewFeature.isFeatureSupported(AndroidWebViewFeature.SERVICE_WORKER_BASIC_USAGE);
@@ -25,6 +35,8 @@ void main() async {
         },
       );
     }
+  } else {
+    currentDeviceType = CurrentDeviceType.iOS;
   }
 
   runApp(MyApp());
@@ -128,6 +140,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
   /// 有額外彈出的WebView視窗
   bool newPopupWebViewWindowDisplayed = false;
 
+  /// iOS使用主網頁,佔用主頁,跳轉儲值
+  bool useIosSelfRedirectForPayout = false;
+
   @override
   void initState() {
     WidgetsBinding.instance?.addPostFrameCallback((_) async {
@@ -144,6 +159,34 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   Future<bool> _onCreateWindow(InAppWebViewController controller, CreateWindowAction createWindowAction) async {
     newPopupWebViewWindowDisplayed = true;
+
+    /// 不知如何塞cookie or storage, 如果url= 空白
+    if (currentDeviceType == CurrentDeviceType.iOS) {
+      // 寫裡面是因為, android的url 是會null, 無法使用toString()方法
+      final String popupUrl = createWindowAction.request.url.toString();
+
+      if (popupUrl == "") {
+        useIosSelfRedirectForPayout = true;
+
+        // 原本的webView 自己跳到gotopage?type=totopay
+        mainWebViewController!.loadUrl(urlRequest: URLRequest(url: Uri.parse('${_mobileUrl}gotopage?type=totopay')));
+
+        // 用不到彈窗,關掉
+        Future.delayed(Duration(milliseconds: 500), () {
+          // 因為他很奇怪會popup兩次,避免此情況
+          if (newPopupWebViewWindowDisplayed) {
+            Navigator.pop(context);
+            newPopupWebViewWindowDisplayed = false;
+          }
+        });
+
+        setState(() {});
+      }
+    }
+
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double screenHeight = MediaQuery.of(context).size.height;
+
     showDialog<AlertDialog>(
       context: context,
       builder: (context) {
@@ -151,8 +194,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
           contentPadding: EdgeInsets.all(2.0),
           insetPadding: EdgeInsets.all(20.0),
           content: Container(
-            width: MediaQuery.of(context).size.width,
-            height: MediaQuery.of(context).size.height,
+            width: screenWidth,
+            height: screenHeight,
             child: InAppWebView(
               // Setting the windowId property is important here!
               windowId: createWindowAction.windowId,
@@ -165,6 +208,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   sharedCookiesEnabled: true,
                 ),
                 crossPlatform: InAppWebViewOptions(
+
                     // userAgent: "Mozilla/5.0 (Linux; Android 9; LG-H870 Build/PKQ1.190522.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.106 Mobile Safari/537.36"
                     ),
               ),
@@ -174,8 +218,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 return ServerTrustAuthResponse(action: ServerTrustAuthResponseAction.PROCEED);
               },
               onLoadStart: (controller, url) async {
-                print("彈窗開始載入: $url");
-
                 /// url 字串
                 final urlString = url.toString();
 
@@ -226,6 +268,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         resizeToAvoidBottomInset: Platform.isAndroid ? false : true,
+        floatingActionButton: useIosSelfRedirectForPayout
+            ? FloatingActionButton(
+                child: Icon(Icons.home),
+                backgroundColor: Color(0xff288ebd),
+                onPressed: () {
+                  mainWebViewController!.loadUrl(urlRequest: URLRequest(url: Uri.parse(_mobileUrl)));
+                  useIosSelfRedirectForPayout = false;
+                  setState(() {});
+                },
+              )
+            : null,
         body: OrientationBuilder(
           builder: (context, orientation) => Container(
             margin: EdgeInsets.only(
@@ -259,11 +312,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           onWebViewCreated: (InAppWebViewController controller) {
                             mainWebViewController = controller;
                           },
-                      // shouldOverrideUrlLoading: (InAppWebViewController controller, NavigationAction navigationAction) async{
-                      //
-                      //       print("我看houldOverrideUrlLoading: $navigationAction");
-                      //       return NavigationActionPolicy.ALLOW;
-                      // },
+
+                          /// ssl證書
+                          onReceivedServerTrustAuthRequest: (InAppWebViewController controller, URLAuthenticationChallenge challenge) async {
+                            return ServerTrustAuthResponse(action: ServerTrustAuthResponseAction.PROCEED);
+                          },
+                          // shouldOverrideUrlLoading: (InAppWebViewController controller, NavigationAction navigationAction) async{
+                          //
+                          //       print("我看houldOverrideUrlLoading: $navigationAction");
+                          //       return NavigationActionPolicy.ALLOW;
+                          // },
 
                           /// 第二種寫法
                           onCreateWindow: (InAppWebViewController controller, CreateWindowAction createWidowAction) async {
@@ -285,8 +343,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
                             print("看看新的!: ${createWidowAction.windowId}");
                             return _onCreateWindow(controller, createWidowAction);
-                          }
-                          )
+                          })
                       : SizedBox(),
                 ),
 
