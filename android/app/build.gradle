@@ -43,7 +43,7 @@ android {
 
     signingConfigs {
         prod {
-            storeFile=file('/Users/johnny/Android_Archive_Key/YTAndroidKeyStore.jks')
+            storeFile=file('/Users/apple/Android_Archive_Key/YTAndroidKeyStore.jks')
             storePassword="yt12345678"
             keyAlias="key0"
             keyPassword="yt12345678"

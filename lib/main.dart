@@ -121,7 +121,7 @@ class WebViewScreen extends StatefulWidget {
 
 class _WebViewScreenState extends State<WebViewScreen> {
   /// mobile 網址
-  final _mobileUrl = "https://csnclubs.com/";
+  final _mobileUrl = "https://app.csnclubs.com/";
 
   double slimmingSize = 0.0;
 
@@ -160,32 +160,36 @@ class _WebViewScreenState extends State<WebViewScreen> {
   Future<bool> _onCreateWindow(InAppWebViewController controller, CreateWindowAction createWindowAction) async {
     newPopupWebViewWindowDisplayed = true;
 
-    /// 不知如何塞cookie or storage, 如果url= 空白
-    if (currentDeviceType == CurrentDeviceType.iOS) {
-      // 寫裡面是因為, android的url 是會null, 無法使用toString()方法
-      final String popupUrl = createWindowAction.request.url.toString();
-
-      if (popupUrl == "") {
-        useIosSelfRedirectForPayout = true;
-
-        // 原本的webView 自己跳到gotopage?type=totopay
-        mainWebViewController!.loadUrl(urlRequest: URLRequest(url: Uri.parse('${_mobileUrl}gotopage?type=totopay')));
-
-        // 用不到彈窗,關掉
-        Future.delayed(Duration(milliseconds: 500), () {
-          // 因為他很奇怪會popup兩次,避免此情況
-          if (newPopupWebViewWindowDisplayed) {
-            Navigator.pop(context);
-            newPopupWebViewWindowDisplayed = false;
-          }
-        });
-
-        setState(() {});
-      }
-    }
+    // /// 不知如何塞cookie or storage, 如果url= 空白
+    // if (currentDeviceType == CurrentDeviceType.iOS) {
+    //   // 寫裡面是因為, android的url 是會null, 無法使用toString()方法
+    //   final String popupUrl = createWindowAction.request.url.toString();
+    //
+    //   print("網址 $popupUrl");
+    //
+    //   if (popupUrl == "") {
+    //     useIosSelfRedirectForPayout = true;
+    //     print("為什麼進來了, 網址是 ${popupUrl}");
+    //     // 原本的webView 自己跳到gotopage?type=totopay
+    //     mainWebViewController!.loadUrl(urlRequest: URLRequest(url: Uri.parse('${_mobileUrl}gotopage?type=totopay')));
+    //
+    //     // 用不到彈窗,關掉
+    //     Future.delayed(Duration(milliseconds: 500), () {
+    //       // 因為他很奇怪會popup兩次,避免此情況
+    //       if (newPopupWebViewWindowDisplayed) {
+    //         Navigator.pop(context);
+    //         newPopupWebViewWindowDisplayed = false;
+    //       }
+    //     });
+    //
+    //     setState(() {});
+    //   }
+    // }
 
     final double screenWidth = MediaQuery.of(context).size.width;
     final double screenHeight = MediaQuery.of(context).size.height;
+
+    final String popupUrl = createWindowAction.request.url.toString();
 
     showDialog<AlertDialog>(
       context: context,
@@ -199,6 +203,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             child: InAppWebView(
               // Setting the windowId property is important here!
               windowId: createWindowAction.windowId,
+              initialUrlRequest: currentDeviceType == CurrentDeviceType.iOS && popupUrl != "" ? URLRequest(url: Uri.parse(popupUrl)) :null,
               initialOptions: InAppWebViewGroupOptions(
                 android: AndroidInAppWebViewOptions(
                   builtInZoomControls: true,
@@ -208,9 +213,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   sharedCookiesEnabled: true,
                 ),
                 crossPlatform: InAppWebViewOptions(
-
-                    // userAgent: "Mozilla/5.0 (Linux; Android 9; LG-H870 Build/PKQ1.190522.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.106 Mobile Safari/537.36"
-                    ),
+                  cacheEnabled: false,
+                  supportZoom: false,
+                  javaScriptEnabled: true,
+                ),
               ),
 
               /// ssl證書
@@ -220,6 +226,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
               onLoadStart: (controller, url) async {
                 /// url 字串
                 final urlString = url.toString();
+
+                print("彈窗,開始載入: $urlString");
 
                 /// 如果載入的字串中,包含了 line.me 的字元,則用外開的方式開啟
                 if (urlString.contains("line.me") || urlString.contains("lin.ee")) {
@@ -302,7 +310,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                               ),
                               ios: IOSInAppWebViewOptions(sharedCookiesEnabled: true),
                               crossPlatform: InAppWebViewOptions(
-                                useShouldOverrideUrlLoading: true,
                                 disableContextMenu: false,
                                 javaScriptCanOpenWindowsAutomatically: true,
                                 cacheEnabled: false,
@@ -317,31 +324,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           onReceivedServerTrustAuthRequest: (InAppWebViewController controller, URLAuthenticationChallenge challenge) async {
                             return ServerTrustAuthResponse(action: ServerTrustAuthResponseAction.PROCEED);
                           },
-                          // shouldOverrideUrlLoading: (InAppWebViewController controller, NavigationAction navigationAction) async{
-                          //
-                          //       print("我看houldOverrideUrlLoading: $navigationAction");
-                          //       return NavigationActionPolicy.ALLOW;
-                          // },
 
                           /// 第二種寫法
                           onCreateWindow: (InAppWebViewController controller, CreateWindowAction createWidowAction) async {
-                            print("來看看喔!: ${createWidowAction.request}");
-                            print("來看看第二種喔!: ${createWidowAction}");
-                            final urlString = createWidowAction.request.url.toString();
-                            final urlEncodeFull = Uri.encodeFull(urlString);
-                            // print("看看網址: $urlEncodeFull");
-                            // if (await canLaunch(urlEncodeFull)) {
-                            //   await launch(urlEncodeFull);
-                            // } else {
-                            //   throw 'Could not launch $urlEncodeFull';
-                            // }
-                            //
-                            // return Future<bool>.value(true);
-                            //
-                            // createWidowAction.request.url = Uri.parse(_mobileUrl + "gotopage?/type=totopay");
-                            // createWidowAction.request.headers = null;
-
-                            print("看看新的!: ${createWidowAction.windowId}");
+                            print("onCreateWindow : $createWidowAction");
                             return _onCreateWindow(controller, createWidowAction);
                           })
                       : SizedBox(),
